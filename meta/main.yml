@@ -1,0 +1,24 @@
+# vim: set et ai ts=2 st=2 sw=2:
+---
+galaxy_info:
+  author: Arnulf Heimsbakk
+  description: Automatic creation and distribution of certificates based on EasyRSA scripts
+  company: NSM NorCERT
+
+  license: GPLv2
+
+  min_ansible_version: 2.4
+
+  platforms:
+  - name: Ubuntu
+    versions:
+    - bionic
+    - 18.04
+
+  galaxy_tags:
+  - easyrsa
+  - ca
+  - ssl
+  - https
+
+dependencies: []

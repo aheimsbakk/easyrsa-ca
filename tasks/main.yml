@@ -1,0 +1,20 @@
+# vim: set et ai ts=2 st=2 sw=2:
+---
+- name: buld easyrsa options string
+  set_fact:
+      easyrsa_ca_options: "--batch --pki-dir='{{ easyrsa_ca_pki_dir }}' --subca-len='{{ easyrsa_ca_subca_len }}' --digest='{{ easyrsa_ca_digest }}' --dn-mode='{{ easyrsa_ca_dn_mode }}' --keysize='{{ easyrsa_ca_keysize }}' --use-algo='{{ easyrsa_ca_use_algo }}' --req-c='{{ easyrsa_ca_req_c }}' --req-st='{{ easyrsa_ca_req_st }}' --req-city='{{ easyrsa_ca_req_city }}' --req-org='{{ easyrsa_ca_req_org }}' --req-email='{{ easyrsa_ca_req_email }}' --req-ou='{{ easyrsa_ca_req_ou }}'"
+
+- name: configure ca server
+  include: configure-ca-server.yml
+  when: ansible_fqdn == easyrsa_ca_server
+
+- name: does ca exits
+  stat:
+    path: "{{ easyrsa_ca_pki_dir }}/ca.crt"
+  delegate_to: '{{ easyrsa_ca_server }}'
+  register: ca_crt_file
+
+- name: configure cert recipient
+  include: cert-recipient.yml
+  when: ca_crt_file.stat.exists
+

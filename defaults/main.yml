@@ -1,0 +1,27 @@
+# vim: set et ai ts=2 st=2 sw=2:
+---
+easyrsa_chain:
+easyrsa_ca_cn: Ansible CA
+easyrsa_ca_dir: /srv/easyrsa3
+easyrsa_ca_pki_dir: /srv/ca/pki
+easyrsa_ca_sub_ca: false
+easyrsa_ca_days: 730
+easyrsa_ca_digest: sha256
+easyrsa_ca_dn_mode: cn_only
+easyrsa_ca_ca_expire: 3650
+easyrsa_ca_cert_renew: 30
+easyrsa_ca_crl_days: 180
+easyrsa_ca_keysize: 4096
+easyrsa_ca_subca_len: 0
+easyrsa_ca_use_algo: rsa
+easyrsa_ca_req_c:
+easyrsa_ca_req_st:
+easyrsa_ca_req_city:
+easyrsa_ca_req_org:
+easyrsa_ca_req_email:
+easyrsa_ca_req_ou:
+easyrsa_x509_type: server
+easyrsa_certificate_dir: /etc/ssl/easyrsa
+easyrsa_ca_hook_services: []
+easyrsa_ca_hook_scripts: []
+easyrsa_ca_revoke: false

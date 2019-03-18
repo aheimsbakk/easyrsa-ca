@@ -1,0 +1,124 @@
+# vim: set et ai ts=2 st=2 sw=2:
+---
+- name: generate default cn if not set
+  set_fact:
+    easyrsa_ca_req_cn: '{{ easyrsa_ca_req_cn|default("{{ ansible_fqdn }}") }}'
+
+- name: generate default alt_names if not set
+  set_fact:
+    easyrsa_ca_subject_alt_name: '{{ easyrsa_ca_subject_alt_name|default("DNS:{{ ansible_fqdn }}") }}'
+
+- name: revoke previous certificate for {{ easyrsa_ca_req_cn }}
+  command: "./easyrsa {{ easyrsa_ca_options }} --days='{{ easyrsa_ca_days }}' --req-cn='{{ easyrsa_ca_req_cn }}' --subject-alt-name='{{ easyrsa_ca_subject_alt_name }}' revoke '{{ easyrsa_ca_req_cn }}' superseded"
+  args:
+    chdir: "{{ easyrsa_ca_dir }}"
+  delegate_to: '{{ easyrsa_ca_server }}'
+  when: easyrsa_ca_revoke
+
+- name: check if request exists for {{ easyrsa_ca_req_cn }}
+  stat:
+    path: '{{ easyrsa_ca_pki_dir }}/reqs/{{ easyrsa_ca_req_cn }}.req'
+  delegate_to: '{{ easyrsa_ca_server }}'
+  register: req_path
+
+- name: create certificate request for {{ easyrsa_ca_req_cn }}
+  command: "./easyrsa {{ easyrsa_ca_options }} --days='{{ easyrsa_ca_days }}' --req-cn='{{ easyrsa_ca_req_cn }}' --subject-alt-name='{{ easyrsa_ca_subject_alt_name }}' gen-req '{{ easyrsa_ca_req_cn }}' nopass"
+  args:
+    chdir: "{{ easyrsa_ca_dir }}"
+  delegate_to: '{{ easyrsa_ca_server }}'
+  when: not req_path.stat.exists
+
+- name: check if certificate exists for {{ easyrsa_ca_req_cn }}
+  stat:
+    path: '{{ easyrsa_ca_pki_dir }}/issued/{{ easyrsa_ca_req_cn }}.crt'
+  delegate_to: '{{ easyrsa_ca_server }}'
+  register: crt_path
+
+- name: sign certificate request for {{ easyrsa_ca_req_cn }}
+  command: "./easyrsa {{ easyrsa_ca_options }} --days='{{ easyrsa_ca_days }}' --req-cn='{{ easyrsa_ca_req_cn }}' --subject-alt-name='{{ easyrsa_ca_subject_alt_name }}' sign-req '{{ easyrsa_x509_type }}' '{{ easyrsa_ca_req_cn }}' nopass"
+  args:
+    chdir: "{{ easyrsa_ca_dir }}"
+  delegate_to: '{{ easyrsa_ca_server }}'
+  when: not crt_path.stat.exists
+
+- name: fail if certificate expires in less than {{ easyrsa_ca_cert_renew }} days
+  shell: "openssl x509 -in {{ easyrsa_ca_pki_dir }}/issued/{{ easyrsa_ca_req_cn }}.crt -checkend $(( {{ easyrsa_ca_cert_renew }} * 86400 ))"
+  register: check_expiring_certificate
+  changed_when: check_expiring_certificate.rc != 0
+  ignore_errors: true
+  delegate_to: '{{ easyrsa_ca_server }}'
+
+- name: renew certificate for {{ easyrsa_ca_req_cn }}
+  command: "./easyrsa {{ easyrsa_ca_options }} --days='{{ easyrsa_ca_days }}' --req-cn='{{ easyrsa_ca_req_cn }}' --subject-alt-name='{{ easyrsa_ca_subject_alt_name }}' renew '{{ easyrsa_ca_req_cn }}'  nopass"
+  args:
+    chdir: "{{ easyrsa_ca_dir }}"
+  delegate_to: '{{ easyrsa_ca_server }}'
+  when: check_expiring_certificate is failed
+
+- name: slurp certificate for {{ easyrsa_ca_req_cn }}
+  slurp:
+    src: '{{ easyrsa_ca_pki_dir }}/issued/{{ easyrsa_ca_req_cn }}.crt'
+  register: slurp_crt
+  delegate_to: '{{ easyrsa_ca_server }}'
+
+- name: slurp private key for {{ easyrsa_ca_req_cn }}
+  slurp:
+    src: '{{ easyrsa_ca_pki_dir }}/private/{{ easyrsa_ca_req_cn }}.key'
+  register: slurp_key
+  delegate_to: '{{ easyrsa_ca_server }}'
+
+- name: slurp ca certificate
+  slurp:
+    src: '{{ easyrsa_ca_pki_dir }}/ca.crt'
+  register: slurp_ca_crt
+  delegate_to: '{{ easyrsa_ca_server }}'
+
+- name: create certificate directory
+  file:
+    path: "{{ easyrsa_certificate_dir }}"
+    state: directory
+    mode: 0755
+
+- name: dist certificate for {{ easyrsa_ca_req_cn }}
+  copy:
+    dest: "{{ easyrsa_certificate_dir }}/{{ easyrsa_ca_req_cn }}.pem"
+    content: "{{ slurp_crt.content|b64decode }}"
+    mode: 0444
+
+- name: dist key for {{ easyrsa_ca_req_cn }}
+  copy:
+    dest: "{{ easyrsa_certificate_dir }}/{{ easyrsa_ca_req_cn }}.key"
+    content: "{{ slurp_key.content|b64decode }}"
+    mode: 0440
+
+- name: dist chain certificate for {{ easyrsa_ca_req_cn }}
+  copy:
+    dest: "{{ easyrsa_certificate_dir }}/{{ easyrsa_ca_req_cn }}-chain.pem"
+    content: "{{ slurp_ca_crt.content|b64decode }}{{ easyrsa_chain }}"
+    mode: 0444
+  register: fullchain_certificate
+
+- name: dist fullchain certificate for {{ easyrsa_ca_req_cn }}
+  copy:
+    dest: "{{ easyrsa_certificate_dir }}/{{ easyrsa_ca_req_cn }}-fullchain.pem"
+    content: "{{ slurp_crt.content|b64decode }}{{ slurp_ca_crt.content|b64decode }}{{ easyrsa_chain }}"
+    mode: 0444
+  register: fullchain_certificate
+
+- name: dist ca certificate
+  copy:
+    dest: "{{ easyrsa_certificate_dir }}/ca.crt"
+    content: "{{ slurp_ca_crt.content|b64decode }}"
+    mode: 0444
+
+- name: restart systemd services due to certificate change
+  systemd:
+    name: "{{ item }}"
+    state: restarted
+  with_items: '{{ easyrsa_ca_hook_services }}'
+  when: fullchain_certificate is changed
+
+- name: run custom hooks due to certificate change
+  command: "{{ item }}"
+  with_items: '{{ easyrsa_ca_hook_scripts }}'
+  when: fullchain_certificate is changed

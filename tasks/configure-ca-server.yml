@@ -1,0 +1,60 @@
+# vim: set et ai ts=2 st=2 sw=2:
+---
+- name: create easyrsa home
+  file:
+    path: "{{ easyrsa_ca_dir }}/x509-types"
+    state: directory
+
+- name: copy easyrsa files to server
+  template:
+    src: "easyrsa3/{{ item }}"
+    dest: "{{ easyrsa_ca_dir }}/{{ item }}"
+  with_items:
+  - vars
+  - x509-types/client
+  - x509-types/code-signing
+  - x509-types/COMMON
+  - x509-types/ca
+  - x509-types/server
+  - x509-types/dc
+  - x509-types/serverClient
+  - openssl-easyrsa.cnf
+
+- name: copy easyrsa script to server
+  copy:
+    src: "easyrsa3/{{ item }}"
+    dest: "{{ easyrsa_ca_dir }}/{{ item }}"
+    mode: 0750
+  with_items:
+  - easyrsa
+
+- name: does pki folder exist
+  stat:
+    path: "{{ easyrsa_ca_pki_dir }}"
+  register: pki_dir
+
+- name: init ca if pki dir does not exits
+  command: "./easyrsa --pki-dir={{ easyrsa_ca_pki_dir }} init-pki"
+  args:
+    chdir: "{{ easyrsa_ca_dir }}"
+  when: not pki_dir.stat.exists
+
+- name: does ca exits
+  stat:
+    path: "{{ easyrsa_ca_pki_dir }}/ca.crt"
+  register: ca_crt_file
+
+- name: build ca
+  command: "./easyrsa {{ easyrsa_ca_options }} --days='{{ easyrsa_ca_ca_expire }}' --req-cn='{{ easyrsa_ca_cn }}' build-ca {{ 'subca' if easyrsa_ca_sub_ca else '' }} nopass"
+  args:
+    chdir: "{{ easyrsa_ca_dir }}"
+  when: not ca_crt_file.stat.exists
+
+- name: rebuild crl always
+  command: "./easyrsa {{ easyrsa_ca_options }} --days='{{ easyrsa_ca_ca_expire }}' --req-cn='{{ easyrsa_ca_cn }}' gen-crl"
+  changed_when: false
+  args:
+    chdir: "{{ easyrsa_ca_dir }}"
+  when: ca_crt_file.stat.exists
+
+
