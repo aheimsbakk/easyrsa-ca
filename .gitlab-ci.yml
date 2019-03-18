@@ -1,0 +1,26 @@
+# vim: set et ai ts=2 st=2 sw=2:
+#
+# Public repo
+#
+# Linting is done with upstream ubuntu image
+#
+---
+image: ubuntu:latest
+
+variables:
+  LANG: "en_US.UTF-8"
+
+before_script:
+- apt-get update
+- apt-get install -y python3-pip 
+- pip3 install ansible-lint
+
+stages:
+- lint
+
+lint:
+  stage: lint
+  script:
+  - ansible-lint -x 204,503 -v .
+  tags: 
+  - dind
