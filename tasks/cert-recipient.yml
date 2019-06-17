@@ -85,6 +85,7 @@
     mode: 0755
     owner: easyrsa
     group: easyrsa
+  ignore_errors: "{{ ansible_check_mode }}"
 
 - name: dist certificate for {{ easyrsa_ca_req_cn }}
   copy:
@@ -93,6 +94,7 @@
     mode: 0444
     owner: easyrsa
     group: easyrsa
+  ignore_errors: "{{ ansible_check_mode }}"
 
 - name: dist key for {{ easyrsa_ca_req_cn }}
   copy:
@@ -101,6 +103,7 @@
     mode: 0440
     owner: easyrsa
     group: easyrsa
+  ignore_errors: "{{ ansible_check_mode }}"
 
 - name: dist chain certificate for {{ easyrsa_ca_req_cn }}
   copy:
@@ -110,6 +113,7 @@
     owner: easyrsa
     group: easyrsa
   register: fullchain_certificate
+  ignore_errors: "{{ ansible_check_mode }}"
 
 - name: dist fullchain certificate for {{ easyrsa_ca_req_cn }}
   copy:
@@ -119,6 +123,7 @@
     owner: easyrsa
     group: easyrsa
   register: fullchain_certificate
+  ignore_errors: "{{ ansible_check_mode }}"
 
 - name: dist ca certificate
   copy:
@@ -127,6 +132,7 @@
     owner: easyrsa
     group: easyrsa
     mode: 0444
+  ignore_errors: "{{ ansible_check_mode }}"
 
 - name: restart systemd services due to certificate change
   systemd:
