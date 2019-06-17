@@ -1,0 +1,56 @@
+#!/bin/bash
+#
+# Company: NSM NorCERT
+# Author: Arnulf Heimsbakk
+# License: GPLv2
+#
+# Test and see how it works:
+#   for i in {1..25}; do ./mutex -n test -- "echo -n lock $i,; sleep .1; echo release $i" & done
+
+function show_help() {
+    show_usage
+    cat >&2 <<EOF
+
+  -n name       lock name, creates a file under /var/lock/mutex_\${name}
+  --            command to run with it's all arguments
+
+Mutex locks in bash implemented with flock.
+All processes started under the same lock name will run mutual exclusive.
+
+EOF
+}
+
+function show_usage() {
+    echo "$(basename $0) [-h] -n name -- command arg1 arg2 .. argN" >&2
+}
+
+if [[ "$@" = "" ]]; then
+    show_usage
+    exit 1
+fi
+
+while getopts ":n:h" opt
+do
+    case $opt in
+        n)  LOCK_NAME="$OPTARG";;
+        h)  show_help; exit 1;;
+        \?) echo $(basename $0) invalid option: -$OPTARG >&2
+            exit 1
+            ;;
+    esac
+done
+
+if [[ "$LOCK_NAME" == "" ]]; then
+  show_usage
+  exit 1
+fi
+
+LOCK_FILE="/var/lock/mutex_$LOCK_NAME"
+
+: >>"$LOCK_FILE"
+{
+  flock ${fd}
+  eval "${@:OPTIND}"
+} {fd}<"$LOCK_FILE"
+
+###### vim: spell spelllang=en:

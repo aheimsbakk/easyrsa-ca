@@ -1,5 +1,10 @@
 # vim: set et ai ts=2 st=2 sw=2:
 ---
+- name: create easyrsa system user and group
+  user:
+    name: easyrsa
+    system: true
+
 - name: generate default cn if not set
   set_fact:
     easyrsa_ca_req_cn: '{{ easyrsa_ca_req_cn|default("{{ ansible_fqdn }}") }}'
@@ -9,7 +14,7 @@
     easyrsa_ca_subject_alt_name: '{{ easyrsa_ca_subject_alt_name|default("DNS:{{ ansible_fqdn }}") }}'
 
 - name: revoke previous certificate for {{ easyrsa_ca_req_cn }}
-  command: "./easyrsa {{ easyrsa_ca_options }} --days='{{ easyrsa_ca_days }}' --req-cn='{{ easyrsa_ca_req_cn }}' --subject-alt-name='{{ easyrsa_ca_subject_alt_name }}' revoke '{{ easyrsa_ca_req_cn }}' superseded"
+  command: "{{ easyrsa_command }} {{ easyrsa_ca_options }} --days='{{ easyrsa_ca_days }}' --req-cn=\\'{{ easyrsa_ca_req_cn }}\\' --subject-alt-name='{{ easyrsa_ca_subject_alt_name }}' revoke \\'{{ easyrsa_ca_req_cn }}\\' superseded"
   args:
     chdir: "{{ easyrsa_ca_dir }}"
   delegate_to: '{{ easyrsa_ca_server }}'
@@ -22,7 +27,7 @@
   register: req_path
 
 - name: create certificate request for {{ easyrsa_ca_req_cn }}
-  command: "./easyrsa {{ easyrsa_ca_options }} --days='{{ easyrsa_ca_days }}' --req-cn='{{ easyrsa_ca_req_cn }}' --subject-alt-name='{{ easyrsa_ca_subject_alt_name }}' gen-req '{{ easyrsa_ca_req_cn }}' nopass"
+  command: "{{ easyrsa_command }} {{ easyrsa_ca_options }} --days='{{ easyrsa_ca_days }}' --req-cn=\\'{{ easyrsa_ca_req_cn }}\\' --subject-alt-name='{{ easyrsa_ca_subject_alt_name }}' gen-req \\'{{ easyrsa_ca_req_cn }}\\' nopass"
   args:
     chdir: "{{ easyrsa_ca_dir }}"
   delegate_to: '{{ easyrsa_ca_server }}'
@@ -35,7 +40,7 @@
   register: crt_path
 
 - name: sign certificate request for {{ easyrsa_ca_req_cn }}
-  command: "./easyrsa {{ easyrsa_ca_options }} --days='{{ easyrsa_ca_days }}' --req-cn='{{ easyrsa_ca_req_cn }}' --subject-alt-name='{{ easyrsa_ca_subject_alt_name }}' sign-req '{{ easyrsa_x509_type }}' '{{ easyrsa_ca_req_cn }}' nopass"
+  command: "{{ easyrsa_command }} {{ easyrsa_ca_options }} --days='{{ easyrsa_ca_days }}' --req-cn=\\'{{ easyrsa_ca_req_cn }}\\' --subject-alt-name='{{ easyrsa_ca_subject_alt_name }}' sign-req '{{ easyrsa_x509_type }}' \\'{{ easyrsa_ca_req_cn }}\\' nopass"
   args:
     chdir: "{{ easyrsa_ca_dir }}"
   delegate_to: '{{ easyrsa_ca_server }}'
@@ -49,7 +54,7 @@
   delegate_to: '{{ easyrsa_ca_server }}'
 
 - name: renew certificate for {{ easyrsa_ca_req_cn }}
-  command: "./easyrsa {{ easyrsa_ca_options }} --days='{{ easyrsa_ca_days }}' --req-cn='{{ easyrsa_ca_req_cn }}' --subject-alt-name='{{ easyrsa_ca_subject_alt_name }}' renew '{{ easyrsa_ca_req_cn }}'  nopass"
+  command: "{{ easyrsa_command }} {{ easyrsa_ca_options }} --days='{{ easyrsa_ca_days }}' --req-cn=\\'{{ easyrsa_ca_req_cn }}\\' --subject-alt-name='{{ easyrsa_ca_subject_alt_name }}' renew \\'{{ easyrsa_ca_req_cn }}\\'  nopass"
   args:
     chdir: "{{ easyrsa_ca_dir }}"
   delegate_to: '{{ easyrsa_ca_server }}'
@@ -78,24 +83,32 @@
     path: "{{ easyrsa_certificate_dir }}"
     state: directory
     mode: 0755
+    owner: easyrsa
+    group: easyrsa
 
 - name: dist certificate for {{ easyrsa_ca_req_cn }}
   copy:
     dest: "{{ easyrsa_certificate_dir }}/{{ easyrsa_ca_req_cn }}.pem"
     content: "{{ slurp_crt.content|b64decode }}"
     mode: 0444
+    owner: easyrsa
+    group: easyrsa
 
 - name: dist key for {{ easyrsa_ca_req_cn }}
   copy:
     dest: "{{ easyrsa_certificate_dir }}/{{ easyrsa_ca_req_cn }}.key"
     content: "{{ slurp_key.content|b64decode }}"
     mode: 0440
+    owner: easyrsa
+    group: easyrsa
 
 - name: dist chain certificate for {{ easyrsa_ca_req_cn }}
   copy:
     dest: "{{ easyrsa_certificate_dir }}/{{ easyrsa_ca_req_cn }}-chain.pem"
     content: "{{ slurp_ca_crt.content|b64decode }}{{ easyrsa_chain }}"
     mode: 0444
+    owner: easyrsa
+    group: easyrsa
   register: fullchain_certificate
 
 - name: dist fullchain certificate for {{ easyrsa_ca_req_cn }}
@@ -103,12 +116,16 @@
     dest: "{{ easyrsa_certificate_dir }}/{{ easyrsa_ca_req_cn }}-fullchain.pem"
     content: "{{ slurp_crt.content|b64decode }}{{ slurp_ca_crt.content|b64decode }}{{ easyrsa_chain }}"
     mode: 0444
+    owner: easyrsa
+    group: easyrsa
   register: fullchain_certificate
 
 - name: dist ca certificate
   copy:
     dest: "{{ easyrsa_certificate_dir }}/ca.crt"
     content: "{{ slurp_ca_crt.content|b64decode }}"
+    owner: easyrsa
+    group: easyrsa
     mode: 0444
 
 - name: restart systemd services due to certificate change
