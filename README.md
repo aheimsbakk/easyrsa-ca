@@ -29,6 +29,7 @@ This role must run in same operation on
 Versions
 ========
 
+* `2.1.1` --- fix lifetime of generated crl
 * `2.1.0` --- all certificates on recipient is now owned by user and group `easyrsa`
 * `2.0.0` --- added mutex handling to easyrsa script to parallelize
 * `1.1.5` --- changed `easyrsa_ca_ca_expire` defaults
